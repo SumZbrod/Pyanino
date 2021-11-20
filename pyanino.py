@@ -50,9 +50,22 @@ class Track():
         return self
 
     def __add__(self, obj):
+        Y = self.Y.copy()
+        time_y = self.time.copy()
         if isinstance(obj, Track):
-            self.Y += obj.Y
-        return self
+            Z = obj.Y.copy()
+            time_z = obj.time.copy()
+            Dy_0 = np.zeros(self.sr*(relu(time_y[0]-time_z[0])))
+            Dy_1 = np.zeros(self.sr*(relu(time_z[1]-time_y[1])))
+            Dz_0 = np.zeros(self.sr*(relu(time_z[0]-time_y[0])))
+            Dz_1 = np.zeros(self.sr*(relu(time_y[1]-time_z[1])))
+            Y = np.concatenate((Dy_0, Y, Dy_1,))
+            Z = np.concatenate((Dz_0, Z, Dz_1,))
+            Y += Z
+            all_time = (min(time_y[0], time_z[0]), max(time_y[1], time_z[1]))
+            new_self = Track(self.K, all_time)
+            new_self.Y = Y
+            return new_self
     
     def play(self):
         sd.play(self.Y/10, self.sr)
@@ -66,10 +79,12 @@ class Track():
         new_self = Track(self.K, self.time)
         new_self.Y = Y
         return new_self
-
-if __name__ == '__main__':
-    C2 = Track(3 , time=(0, 3))
-    E2 = Track(7 , time=(0, 3))
-    G2 = Track(10, time=(0, 3))
-
-    Y = (C2 + E2 + G2)/3
+    
+    def normal(self, a):
+        Y = self.Y.copy()
+        X = np.linspace(*self.time, self.length)
+        x_0 = sum(self.time)/2
+        Y *= np.exp(-a*(X-x_0)**2)
+        new_self = Track(self.K, self.time)
+        new_self.Y = Y
+        return new_self
