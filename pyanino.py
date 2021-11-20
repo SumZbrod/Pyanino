@@ -66,3 +66,10 @@ class Track():
         new_self = Track(self.K, self.time)
         new_self.Y = Y
         return new_self
+
+if __name__ == '__main__':
+    C2 = Track(3 , time=(0, 3))
+    E2 = Track(7 , time=(0, 3))
+    G2 = Track(10, time=(0, 3))
+
+    Y = (C2 + E2 + G2)/3
