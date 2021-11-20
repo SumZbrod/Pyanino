@@ -1,6 +1,8 @@
 import sounddevice as sd
 import matplotlib.pyplot as plt
 import numpy as np
+def relu(x):
+    return x if x >= 0 else 0
 
 class Track():
     def __init__(self, K=0, time=1):
