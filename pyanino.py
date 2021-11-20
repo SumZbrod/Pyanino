@@ -4,6 +4,7 @@ import numpy as np
 
 def relu(x):
     return x if x >= 0 else 0
+
 class Track():
     def __init__(self, K=0, time=1):
         '''
@@ -25,6 +26,16 @@ class Track():
             Y += np.sin(2*np.pi*self.secs*self.X*self.A1*2**(k/12))
         self.Y = Y/len(self.K)
 
+    def new(self, K=None, time=None, Y=None):
+        if K == None:
+            K = self.K
+        if time == None:
+            time = self.time
+        new_self = Track(K, time)
+        if Y is not None:
+            new_self.Y = Y
+        return new_self
+
     def __repr__(self):
         T = np.linspace(*self.time, self.length)
         plt.plot(T, self.Y)
@@ -33,11 +44,9 @@ class Track():
         return ''
     
     def __mul__(self, object):
-        Y = self.Y.copy()
+        new_self = self.new()
         if isinstance(object, float) or isinstance(object, int):
-            Y *= object
-        new_self = Track(self.K, self.time)
-        new_self.Y = Y
+            new_self.Y *= object
         return new_self
     
     def __rmul__(self, object):
@@ -54,22 +63,18 @@ class Track():
         return self
 
     def __add__(self, obj):
-        Y = self.Y.copy()
-        time_y = self.time.copy()
+        A = self.new()
         if isinstance(obj, Track):
-            Z = obj.Y.copy()
-            time_z = obj.time.copy()
-            Dy_0 = np.zeros(self.sr*(relu(time_y[0]-time_z[0])))
-            Dy_1 = np.zeros(self.sr*(relu(time_z[1]-time_y[1])))
-            Dz_0 = np.zeros(self.sr*(relu(time_z[0]-time_y[0])))
-            Dz_1 = np.zeros(self.sr*(relu(time_y[1]-time_z[1])))
-            Y = np.concatenate((Dy_0, Y, Dy_1,))
-            Z = np.concatenate((Dz_0, Z, Dz_1,))
+            B = obj.new()
+            Dy_0 = np.zeros(self.sr*(relu(A.time[0]-B.time[0])))
+            Dy_1 = np.zeros(self.sr*(relu(B.time[1]-A.time[1])))
+            Dz_0 = np.zeros(self.sr*(relu(B.time[0]-A.time[0])))
+            Dz_1 = np.zeros(self.sr*(relu(A.time[1]-B.time[1])))
+            Y = np.concatenate((Dy_0, A.Y, Dy_1,))
+            Z = np.concatenate((Dz_0, B.Y, Dz_1,))
             Y += Z
-            all_time = (min(time_y[0], time_z[0]), max(time_y[1], time_z[1]))
-            new_self = Track(self.K, all_time)
-            new_self.Y = Y
-            return new_self
+            all_time = (min(A.time[0], B.time[0]), max(A.time[1], B.time[1]))
+            return self.new(time=all_time, Y=Y)
     
     def __getitem__(self, s):
         Y = self.Y.copy()
