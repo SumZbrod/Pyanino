@@ -1,18 +1,20 @@
 import sounddevice as sd
 import matplotlib.pyplot as plt
 import numpy as np
+
 def relu(x):
     return x if x >= 0 else 0
-
 class Track():
     def __init__(self, K=0, time=1):
         '''
         K - number of note, or list of nums
         '''
+        if isinstance(time, float) or isinstance(time, int):
+            time = (0, time)
         self.secs = time[1] - time[0]
         assert self.secs > 0, "finish time must be more then start"
         self.sr = 48000
-        self.length = self.secs*self.sr
+        self.length = round(self.secs*self.sr)
 
         self.K = [K] if isinstance(K, int) else K
         self.time = list(time)
@@ -69,6 +71,13 @@ class Track():
             new_self.Y = Y
             return new_self
     
+    def __getitem__(self, s):
+        Y = self.Y.copy()
+        Y = Y[s]
+        new_self = Track(self.K, len(Y)/self.sr)
+        new_self.Y = Y
+        return new_self
+
     def play(self):
         sd.play(self.Y/10, self.sr)
 
@@ -82,7 +91,7 @@ class Track():
         new_self.Y = Y
         return new_self
     
-    def normal(self, a):
+    def normal(self, a=1):
         Y = self.Y.copy()
         X = np.linspace(*self.time, self.length)
         x_0 = sum(self.time)/2
