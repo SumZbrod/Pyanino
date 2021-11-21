@@ -5,66 +5,82 @@ import numpy as np
 def relu(x):
     return x if x >= 0 else 0
 
-class Track():
-    def __init__(self, K=0, time=1):
+def is_number(x):
+    return isinstance(x, float) or isinstance(x, int)
+
+class Sample():
+    def __init__(self, K=0, time=None, Y=None, A1=440):
         '''
         K - number of note, or list of nums
         '''
-        if isinstance(time, float) or isinstance(time, int):
+        self.sr = 48000
+        
+        if time == None:
+            if Y is not None:
+                time = [0, Y.size/self.sr]
+            else:
+                time = (0, 1)
+        elif is_number(time):
             time = (0, time)
+        
         self.secs = time[1] - time[0]
         assert self.secs > 0, "finish time must be more then start"
-        self.sr = 48000
         self.length = round(self.secs*self.sr)
-
-        self.K = [K] if isinstance(K, int) else K
         self.time = list(time)
-        self.A1 = 440
-        self.X = np.arange(self.length)/self.length
-        Y = 0
-        for k in self.K:
-            Y += np.sin(2*np.pi*self.secs*self.X*self.A1*2**(k/12))
-        self.Y = Y/len(self.K)
+
+        if Y is None:
+            K = [K] if is_number(K) else K
+            X = np.arange(self.length)/self.length
+            Y = 0
+            for k in K:
+                Y += np.sin(2*np.pi*self.secs*X*self.A1*2**(k/12))
+            self.Y = Y/len(K)
+        else:
+            self.Y = Y
+            
+    def __len__(self):
+        return self.length
 
     def new(self, K=None, time=None, Y=None):
-        if K == None:
-            K = self.K
         if time == None:
             time = self.time
-        new_self = Track(K, time)
-        if Y is not None:
-            new_self.Y = Y
-        return new_self
+        if K == None:
+            if Y is None:
+                return Sample(Y=self.Y, time=time)
+            else:
+                return Sample(Y=Y, time=time)
+        else:
+            return Sample(K=K, time=time)
 
     def __repr__(self):
-        T = np.linspace(*self.time, self.length)
+        T = np.linspace(*self.time, len(self))
         plt.plot(T, self.Y)
         plt.ylabel('Amplitude')
         plt.xlabel('time on seconds')
         return ''
     
-    def __mul__(self, object):
+    def __mul__(self, obj):
         new_self = self.new()
-        if isinstance(object, float) or isinstance(object, int):
-            new_self.Y *= object
+        if is_number(obj):
+            new_self.Y *= obj
         return new_self
     
-    def __rmul__(self, object):
-        return self * object
+    def __rmul__(self, obj):
+        return self * obj
 
     def __truediv__(self, obj):
-        if isinstance(obj, float) or isinstance(obj, int):
+        if is_number(obj):
             self *= 1/obj
         return self
     
     def __floordiv__(self, obj):
-        if isinstance(obj, float) or isinstance(obj, int):
+        if is_number(obj):
             self *= 1/obj
         return self
 
     def __add__(self, obj):
         A = self.new()
-        if isinstance(obj, Track):
+        if isinstance(obj, Sample):
             B = obj.new()
             Dy_0 = np.zeros(self.sr*(relu(A.time[0]-B.time[0])))
             Dy_1 = np.zeros(self.sr*(relu(B.time[1]-A.time[1])))
@@ -79,7 +95,7 @@ class Track():
     def __getitem__(self, s):
         Y = self.Y.copy()
         Y = Y[s]
-        new_self = Track(self.K, len(Y)/self.sr)
+        new_self = Sample(time=len(Y)/self.sr)
         new_self.Y = Y
         return new_self
 
@@ -88,12 +104,18 @@ class Track():
 
     def stop(self):
         sd.stop()
-
+        
+class Track(Sample):
+    def __init__(self, sample):
+        super().__init__(time=sample.time)
+        self.Y = sample.Y
+        self.sample = sample
+        
     def apply(self, func):
-        Y = self.Y.copy()
-        Y = func(Y)
-        new_self = Track(self.K, self.time)
-        new_self.Y = Y
+        sample = self.sample.copy()
+        sample = func(sample)
+        new_self = Track(sample)
+        new_self.sample = sample
         return new_self
     
     def normal(self, a=1):
@@ -101,6 +123,33 @@ class Track():
         X = np.linspace(*self.time, self.length)
         x_0 = sum(self.time)/2
         Y *= np.exp(-a*(X-x_0)**2)
-        new_self = Track(self.K, self.time)
+        new_self = Track(time=self.time)
         new_self.Y = Y
         return new_self
+    
+    def __add__(self, obj):
+        A = self.new( )
+        B =  obj.new( )
+        Y = np.concatenate((A.Y, B.Y))
+        time_c = list(A.time)
+        time_c[1] += sum(B.time)
+        C = Track(Sample(time=time_c))
+        C.Y = Y
+        return C
+
+    def __rmul__(self, obj):
+        new_self = self.new()
+        int_l = int(obj//1)
+        post_l = round((obj - int_l)*len(self))
+        print(int_l, post_l)
+        new_self.Y = np.tile(new_self.Y, int_l)
+        new_self.Y = np.concatenate((new_self.Y, new_self.Y[:post_l]))
+        new_time = list(new_self.time)
+        time_delta = new_time[1] - new_time[0]
+        new_time[1] += time_delta*(int_l-1)
+        new_time[1] += post_l/new_self.sr
+        return Track(Sample(time=new_time, Y=new_self.Y))
+
+    # def __add__(self):
+        
+    
