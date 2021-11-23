@@ -33,7 +33,7 @@ class Sample():
             X = np.arange(self.length)/self.length
             Y = 0
             for k in K:
-                Y += np.sin(2*np.pi*self.secs*X*self.A1*2**(k/12))
+                Y += np.sin(2*np.pi*self.secs*X*A1*2**(k/12))
             self.Y = Y/len(K)
         else:
             self.Y = Y
@@ -79,6 +79,7 @@ class Sample():
         return self
 
     def __add__(self, obj):
+        
         A = self.new()
         if isinstance(obj, Sample):
             B = obj.new()
@@ -104,16 +105,20 @@ class Sample():
 
     def stop(self):
         sd.stop()
-        
+    
+    def to_track(self):
+        return Track(sample=self)
+
 class Track(Sample):
-    def __init__(self, sample):
-        super().__init__(time=sample.time)
-        self.Y = sample.Y
-        self.sample = sample
+    def __init__(self, K=0, time=None, Y=None, A1=440, sample=None):
+        if sample is not None:
+            time = sample.time
+            Y = sample.Y
+        super().__init__(K=K, time=time, Y=Y, A1=A1)
         
     def apply(self, func):
-        sample = self.sample.copy()
-        sample = func(sample)
+        sample = self.copy()
+        sample = func(sample.Y)
         new_self = Track(sample)
         new_self.sample = sample
         return new_self
@@ -123,33 +128,36 @@ class Track(Sample):
         X = np.linspace(*self.time, self.length)
         x_0 = sum(self.time)/2
         Y *= np.exp(-a*(X-x_0)**2)
-        new_self = Track(time=self.time)
-        new_self.Y = Y
+        new_self = Track(time=self.time, Y=Y)
         return new_self
     
     def __add__(self, obj):
-        A = self.new( )
-        B =  obj.new( )
+        if obj == 0:
+            return self
+        A = self.new()
+        B =  obj.new()
         Y = np.concatenate((A.Y, B.Y))
         time_c = list(A.time)
         time_c[1] += sum(B.time)
-        C = Track(Sample(time=time_c))
-        C.Y = Y
+        C = Track(time=time_c, Y=Y)
         return C
+
+    def __radd__(self, obj):
+        return self + obj
 
     def __rmul__(self, obj):
         new_self = self.new()
         int_l = int(obj//1)
         post_l = round((obj - int_l)*len(self))
-        print(int_l, post_l)
         new_self.Y = np.tile(new_self.Y, int_l)
         new_self.Y = np.concatenate((new_self.Y, new_self.Y[:post_l]))
         new_time = list(new_self.time)
         time_delta = new_time[1] - new_time[0]
         new_time[1] += time_delta*(int_l-1)
         new_time[1] += post_l/new_self.sr
-        return Track(Sample(time=new_time, Y=new_self.Y))
+        return Track(time=new_time, Y=new_self.Y)
 
-    # def __add__(self):
+    def to_sample(self):
+        return Sample(time=self.time, Y=self.Y)
         
     
